@@ -48,7 +48,7 @@ const Header = () => {
 
   const translatedMenuData = menuDataFromFile.map(item => ({
     ...item,
-    title: translations.header[item.title.toLowerCase().replace(/\s+/g, '') as keyof typeof translations.header] || item.title
+    title: item.title === "Our Services" ? translations.header.services : translations.header[item.title.toLowerCase().replace(/\s+/g, '') as keyof typeof translations.header] || item.title
   }));
 
   // Get the current logo source from translations
