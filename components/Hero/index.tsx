@@ -4,10 +4,44 @@
 import Link from "next/link";
 // 1. Import useLanguage hook
 import { useLanguage } from "../../context/LanguageContext";
+import { useState, FormEvent } from "react";
+import Modal from "../Modal";
+import type { ContainerInfo } from "../../types/container";
 
 const Hero = () => {
   // 2. Use the hook to get translations
   const { translations } = useLanguage();
+
+  const [containerNumber, setContainerNumber] = useState("");
+  const [data, setData] = useState<ContainerInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const clean = containerNumber.trim().toUpperCase().replace(/\s+/g, "");
+    if (clean.length !== 11) {
+      setError("Container number should be 11 characters (e.g., TEMU1234567)");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/container?containerNumber=${encodeURIComponent(clean)}`);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || `Error: ${res.status}`);
+      }
+      const typed: ContainerInfo = json;
+      setData(json);
+      setIsOpen(true);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -37,15 +71,18 @@ const Hero = () => {
               Speed of Completion & Accuracy of Performance
             </p> */}
 
-            <div className="relative w-full max-w-md mt-12"> {/* Search bar container */}
+            <form onSubmit={handleSubmit} className="relative w-full max-w-md mt-12">
               <input
                 type="text"
-                placeholder={translations.hero.containerPlaceholder} // Assuming you've updated this for translations
+                value={containerNumber}
+                onChange={(e) => setContainerNumber(e.target.value.toUpperCase())}
+                placeholder={translations.hero.containerPlaceholder}
                 className="w-full shadow-lg shadow-blue-200 rounded-full border border-stroke bg-white px-6 py-4 pr-14 text-base text-body-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none"
               />
               <button
                 type="submit"
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-blue-900 p-3 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-white/10 dark:hover:bg-white/5"
+                disabled={loading || !containerNumber}
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-blue-900 p-3 text-white hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary dark:bg-white/10 dark:hover:bg-white/5"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -73,10 +110,34 @@ const Hero = () => {
                   />
                 </svg>
               </button>
-            </div>
+            </form>
+            {error && <p className="mt-2 text-red-600">{error}</p>}
           </div>
         </div>
       </section>
+
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title={data ? `Container ${data.ContainerNumber}` : undefined}
+      >
+        {data ? (
+          <div className="space-y-2 text-sm text-gray-700 dark:text-gray-200">
+            <p><strong>Status:</strong> {data.Status}</p>
+            <p><strong>POL:</strong> {data.Pol}</p>
+            <p><strong>POD:</strong> {data.Pod}</p>
+            <p><strong>Vessel:</strong> {data.Vessel} (Voyage {data.VesselVoyage})</p>
+            {data.ArrivalDate && (
+              <p><strong>ETA:</strong> {new Date(data.ArrivalDate.Date).toLocaleDateString()}</p>
+            )}
+            {data.ETA && <p><strong>Delay:</strong> {data.ETA}</p>}
+            {data.Co2Emission && <p><strong>CO₂:</strong> {data.Co2Emission}</p>}
+            {data.LiveMapUrl && (
+              <p><a href={data.LiveMapUrl} target="_blank" className="text-blue-600 underline">Live Map</a></p>
+            )}
+          </div>
+        ) : null}
+      </Modal>
     </>
   );
 };
